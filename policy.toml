@@ -1,0 +1,26 @@
+# agentwarden policy: the FIRST matching rule wins; if none match, `default` applies.
+#
+# Matcher semantics (matched against the whitespace-trimmed command string):
+#   prefix : command starts with the given string
+#   exact  : command equals the given string
+#   glob   : whole-command glob match (e.g. "cat *.env")
+#   regex  : UNANCHORED, matches anywhere; anchor with ^ / $ if you mean the whole command
+# Matching is string-pattern based, not a shell parser; see the threat model in README.md.
+default = "ask"
+
+# `rules` is a heterogeneous list (serde `untagged` RuleSpec):
+#   - a bare string  => deny-prefix shorthand
+#   - a table        => a full rule, tagged by `type` (exact | prefix | regex | glob)
+# A rule table may add `agent = "..."` and/or `tool = "..."` to scope it to a
+# specific agent/tool; unscoped rules apply to every call.
+rules = [
+  "sudo",                                                                                  # shorthand: deny anything starting with "sudo"
+  { type = "prefix", prefix = "rm -rf",        action = "deny",  reason = "destructive filesystem command" },
+  { type = "glob",   pattern = "cat *.env",    action = "deny",  reason = "reading secrets" },
+  { type = "regex",  pattern = "^git\\s+push", action = "ask",   reason = "network mutation needs confirmation" },
+  { type = "prefix", prefix = "curl",          action = "ask",   tool = "bash", reason = "network egress from the bash tool" },
+  { type = "exact",  command = "git status",   action = "allow" },
+  { type = "prefix", prefix = "ls",            action = "allow" },
+  { type = "prefix", prefix = "cat",           action = "allow" },
+  { type = "prefix", prefix = "echo",          action = "allow" },
+]
